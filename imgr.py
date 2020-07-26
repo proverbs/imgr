@@ -1,10 +1,12 @@
 import re
 import os
 import json
+import http
 import subprocess
 from shutil import copyfile
 
 import click
+import requests
 
 _CWD = os.getcwd()
 _HOME = os.path.expanduser('~')
@@ -145,6 +147,14 @@ def push(message):
     click.echo('Pushed!')
 
 
+def _check_remote_valide(url):
+    try:
+        hd = requests.head(url, timeout=1)
+        return hd.status_code == http.HTTPStatus.OK
+    except:
+        return False
+
+
 @click.command()
 @click.argument('dst', type=str, default="", required=False)
 def show(dst):
@@ -154,13 +164,18 @@ def show(dst):
     if not os.path.exists(dst_path):
         raise ValueError(f'{dst_path} does not exist!')
     if os.path.isfile(dst_path):
-        click.echo(f'{dst}\t {os.path.join(_RAW_BASE_URL, dst)}')
+        url = os.path.join(_RAW_BASE_URL, dst)
+        remote_valid = _check_remote_valide(url)
+        fg = 'red' if not remote_valid else None
+        click.secho(f'{dst}\t {url}', fg=fg)
     else:
         for filename in os.listdir(dst_path):
             if os.path.isfile(os.path.join(dst_path, filename)):
                 ext_url = os.path.join(dst, filename)
-                click.echo(
-                    f'{ext_url}\t {os.path.join(_RAW_BASE_URL, ext_url)}')
+                url = os.path.join(_RAW_BASE_URL, ext_url)
+                remote_valid = _check_remote_valide(url)
+                fg = 'red' if not remote_valid else None
+                click.secho(f'{ext_url}\t {url}', fg=fg)
 
 
 @click.command()
@@ -174,10 +189,11 @@ def ls(dst):
     for filename in os.listdir(dst_path):
         if os.path.isfile(os.path.join(dst_path, filename)):
             relative_path = os.path.join(dst, filename)
-            click.echo(f'{relative_path}')
+            click.echo(f'\t{relative_path}', nl=False)
         elif not filename.startswith('.'):
             relative_path = os.path.join(dst, filename)
-            click.secho(f'{relative_path}/', fg='red')
+            click.secho(f'\t{relative_path}/', fg='red', nl=False)
+    click.echo('')
 
 
 @click.group()
