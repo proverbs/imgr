@@ -181,7 +181,7 @@ def show(dst):
 @click.command()
 @click.argument('dst', type=str, default="", required=False)
 def ls(dst):
-    """list all images and dirs."""
+    """List all images and dirs."""
     _check_configuration()
     dst_path = os.path.join(_LOCAL_BASE, dst)
     if not os.path.exists(dst_path):
@@ -196,6 +196,27 @@ def ls(dst):
     click.echo('')
 
 
+def _git_clone(git_url):
+    process = subprocess.Popen(['git', 'clone', git_url],
+                               cwd=_CWD,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    if process.returncode:
+        raise ValueError(err.decode('utf-8'))
+
+
+@click.command()
+@click.argument('git-url', type=str, required=True)
+def init(git_url):
+    """Init a image hosting repo from a remote repo."""
+    _check_configuration()
+    if not git_url.startswith('git@github.com:'):
+        raise ValueError("Please use ssh git url!")
+    _git_clone(git_url)
+    click.echo(f'{git_url} is cloned successfully!')
+
+
 @click.group()
 def cli():
     pass
@@ -207,6 +228,7 @@ cli.add_command(add)
 cli.add_command(push)
 cli.add_command(show)
 cli.add_command(ls)
+cli.add_command(init)
 
 if __name__ == '__main__':
     _init()
