@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from shutil import copyfile
 
 import click
@@ -22,6 +23,7 @@ def _check_configuration():
     global _LOCAL_BASE
     if _LOCAL_BASE is None:
         raise ValueError('Please run `imgr config` first!')
+    # TODO: check if it's a git repo
 
 
 @click.command()
@@ -36,7 +38,7 @@ def configure(local_base):
         raise ValueError('Please specify a dir!')
     with open(_CONFIGURE_PATH, 'w') as f:
         json.dump({'local-base': base_dir}, f)
-        click.echo(f'Local base is set successfully to {base_dir}')
+    click.echo(f'Local base is set successfully to {base_dir}')
 
 
 @click.command()
@@ -65,6 +67,59 @@ def add(src, dst):
     click.echo(f'Added new image: {dst_path}')
 
 
+def _git_status_clean():
+    process = subprocess.Popen(['git', 'status', '--porcelain=v1'],
+                               cwd=_LOCAL_BASE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    if len(out) == 0:
+        raise ValueError('Local base is clean, nothing new to push!')
+
+
+def _git_add():
+    process = subprocess.Popen(['git', 'add', '.'],
+                               cwd=_LOCAL_BASE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    if process.returncode:
+        raise ValueError(err.decode('utf-8'))
+
+
+def _git_commit(message):
+    process = subprocess.Popen(['git', 'commit', '-m', message],
+                               cwd=_LOCAL_BASE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    if process.returncode:
+        raise ValueError(err.decode('utf-8'))
+    click.echo(out.decode('utf-8'))
+
+
+def _git_push():
+    process = subprocess.Popen(['git', 'push', '-u', 'origin', 'master'],
+                               cwd=_LOCAL_BASE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    if process.returncode:
+        raise ValueError(err.decode('utf-8'))
+
+
+@click.command()
+@click.option('--message', type=str, required=True, help="Commit message.")
+def push(message):
+    """Commit and push to remote."""
+    _check_configuration()
+    _git_status_clean()
+    _git_add()
+    _git_commit(message)
+    _git_push()
+    click.echo('Pushed!')
+
+
 @click.group()
 def cli():
     pass
@@ -73,6 +128,7 @@ def cli():
 cli.add_command(configure)
 cli.add_command(mkdir)
 cli.add_command(add)
+cli.add_command(push)
 
 if __name__ == '__main__':
     _init()
