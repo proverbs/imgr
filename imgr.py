@@ -163,6 +163,23 @@ def show(dst):
                     f'{ext_url}\t {os.path.join(_RAW_BASE_URL, ext_url)}')
 
 
+@click.command()
+@click.argument('dst', type=str, default="", required=False)
+def ls(dst):
+    """list all images and dirs."""
+    _check_configuration()
+    dst_path = os.path.join(_LOCAL_BASE, dst)
+    if not os.path.exists(dst_path):
+        raise ValueError(f'{dst_path} does not exist!')
+    for filename in os.listdir(dst_path):
+        if os.path.isfile(os.path.join(dst_path, filename)):
+            relative_path = os.path.join(dst, filename)
+            click.echo(f'{relative_path}')
+        elif not filename.startswith('.'):
+            relative_path = os.path.join(dst, filename)
+            click.secho(f'{relative_path}/', fg='red')
+
+
 @click.group()
 def cli():
     pass
@@ -173,6 +190,7 @@ cli.add_command(mkdir)
 cli.add_command(add)
 cli.add_command(push)
 cli.add_command(show)
+cli.add_command(ls)
 
 if __name__ == '__main__':
     _init()
