@@ -1,5 +1,6 @@
 import os
 import json
+from shutil import copyfile
 
 import click
 
@@ -50,6 +51,20 @@ def mkdir(dir_name):
     click.echo(f'New dir created: {new_dir}')
 
 
+@click.command()
+@click.argument('src', type=click.Path(exists=True), required=True)
+@click.argument('dst', type=str, required=True)
+def add(src, dst):
+    """Add an image to local base."""
+    _check_configuration()
+    dst_path = os.path.join(_LOCAL_BASE, dst)
+    dst_dir = os.path.dirname(dst_path)
+    if not os.path.exists(dst_dir):
+        raise ValueError(f'{dst_dir} does not exist!')
+    copyfile(src, dst_path)
+    click.echo(f'Added new image: {dst_path}')
+
+
 @click.group()
 def cli():
     pass
@@ -57,6 +72,7 @@ def cli():
 
 cli.add_command(configure)
 cli.add_command(mkdir)
+cli.add_command(add)
 
 if __name__ == '__main__':
     _init()
