@@ -1,3 +1,4 @@
+import re
 import os
 import json
 import subprocess
@@ -9,6 +10,8 @@ _CWD = os.getcwd()
 _HOME = os.path.expanduser('~')
 _CONFIGURE_PATH = os.path.join(_HOME, '.imgr.json')
 _LOCAL_BASE = None
+_RAW_BASE_URL = 'https://raw.githubusercontent.com/'
+_RELATIVE_URL_REGEX = re.compile(r'git@github\.com:(.*?)\.git')
 
 
 def _init():
@@ -21,9 +24,31 @@ def _init():
 
 def _check_configuration():
     global _LOCAL_BASE
+    global _RAW_BASE_URL
     if _LOCAL_BASE is None:
         raise ValueError('Please run `imgr config` first!')
-    # TODO: check if it's a git repo
+    _git_raw_base_url()
+
+
+def _git_raw_base_url():
+    global _RELATIVE_URL_REGEX
+    global _RAW_BASE_URL
+    process = subprocess.Popen(['git', 'remote', '-v'],
+                               cwd=_LOCAL_BASE,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    if process.returncode:
+        raise ValueError(err.decode('utf-8'))
+    ext_url = None
+    for line in out.decode('utf-8').split('\n'):
+        match = _RELATIVE_URL_REGEX.search(line)
+        if match:
+            ext_url = match.group(1)
+            break
+    if not ext_url:
+        raise ValueError('Git repo not configured correctly!')
+    _RAW_BASE_URL += ext_url + '/master/'
 
 
 @click.command()
@@ -120,6 +145,24 @@ def push(message):
     click.echo('Pushed!')
 
 
+@click.command()
+@click.argument('dst', type=str, default="", required=False)
+def show(dst):
+    """Show images' raw URLs."""
+    _check_configuration()
+    dst_path = os.path.join(_LOCAL_BASE, dst)
+    if not os.path.exists(dst_path):
+        raise ValueError(f'{dst_path} does not exist!')
+    if os.path.isfile(dst_path):
+        click.echo(f'{dst}\t {os.path.join(_RAW_BASE_URL, dst)}')
+    else:
+        for filename in os.listdir(dst_path):
+            if os.path.isfile(os.path.join(dst_path, filename)):
+                ext_url = os.path.join(dst, filename)
+                click.echo(
+                    f'{ext_url}\t {os.path.join(_RAW_BASE_URL, ext_url)}')
+
+
 @click.group()
 def cli():
     pass
@@ -129,6 +172,7 @@ cli.add_command(configure)
 cli.add_command(mkdir)
 cli.add_command(add)
 cli.add_command(push)
+cli.add_command(show)
 
 if __name__ == '__main__':
     _init()
